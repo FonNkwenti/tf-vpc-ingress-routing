@@ -175,7 +175,10 @@ module "application_instance" {
   vpc_security_group_ids = [module.application_sg.security_group_id]
   subnet_id              = module.vpc.private_subnets[0] # Public Subnet (Now "Private" routing)
   associate_public_ip_address = true
-
+  
+  # Ensure router is ready before app tries to download packages
+  depends_on = [module.inspection_instance]
+  
   user_data = file("${path.module}/scripts/app_userdata.sh")
 
   tags = {
