@@ -30,11 +30,17 @@ This Terraform project deploys an AWS architecture demonstrating **VPC Ingress R
     ```
 
 3.  **Configure Variables:**
-    Copy the example variables file:
-    ```bash
-    cp terraform.tfvars.example terraform.tfvars
+    Create a `terraform.tfvars` file to override the default values. For example:
+
+    ```hcl
+    region                 = "us-east-1"
+    vpc_cidr               = "10.0.0.0/16"
+    inspection_subnet_cidr = "10.0.50.0/24"
+    public_subnet_cidr     = "10.0.100.0/24"
+    ssh_key_name           = "CHANGE_ME" # Replace with your actual key name
+    instance_type          = "t3.micro"
+    allowed_mgmt_cidr      = "0.0.0.0/0"
     ```
-    Open `terraform.tfvars` and set `ssh_key_name` to your actual AWS key pair name. You can also customize other variables here.
 
 4.  **Plan and Apply:**
     ```bash
