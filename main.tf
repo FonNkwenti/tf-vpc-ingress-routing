@@ -95,7 +95,7 @@ module "inspection_sg" {
   vpc_id      = module.vpc.vpc_id
 
   ingress_cidr_blocks = ["0.0.0.0/0"]
-  ingress_rules       = ["http-80-tcp", "all-icmp"]
+  ingress_rules       = ["http-80-tcp", "all-icmp"] # 'all-icmp' enables ping for troubleshooting
   
   # SSH access
   ingress_with_cidr_blocks = [
@@ -120,7 +120,7 @@ module "application_sg" {
   # which preserves source IP if just routing, OR if masquerading acts as source.
   # The requirement says "routing", implying source IP preservation.
   ingress_cidr_blocks = ["0.0.0.0/0"]
-  ingress_rules       = ["http-80-tcp", "all-icmp"]
+  ingress_rules       = ["http-80-tcp", "all-icmp"] # 'all-icmp' enables ping for troubleshooting
 
   # SSH access
   ingress_with_cidr_blocks = [
