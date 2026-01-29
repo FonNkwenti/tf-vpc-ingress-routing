@@ -150,6 +150,7 @@ module "inspection_instance" {
   monitoring             = true
   vpc_security_group_ids = [module.inspection_sg.security_group_id]
   subnet_id              = module.vpc.private_subnets[0] # Inspection Subnet
+  associate_public_ip_address = true
 
   # Critical for Routing
   source_dest_check      = false

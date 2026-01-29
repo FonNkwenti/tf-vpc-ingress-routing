@@ -17,3 +17,7 @@ output "application_instance_id" {
 output "inspection_eni_id" {
   value = module.inspection_instance.primary_network_interface_id
 }
+
+output "inspection_public_ip" {
+  value = module.inspection_instance.public_ip
+}

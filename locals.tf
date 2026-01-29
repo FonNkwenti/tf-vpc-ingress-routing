@@ -1,5 +1,5 @@
 locals {
-  name   = "vpc-ingress-project"
+  name   = "vpc-ingress-routing"
   region = var.region
   
   # Forcing single AZ for simplicity as per original diagram

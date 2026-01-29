@@ -83,6 +83,7 @@ This Terraform project deploys an AWS architecture demonstrating **VPC Ingress R
 |------|-------------|
 | `vpc_id` | The ID of the VPC |
 | `application_public_ip` | Public IP of the application server |
+| `inspection_public_ip` | Public IP of the inspection appliance |
 | `inspection_instance_id` | Instance ID of the inspection appliance |
 | `application_instance_id` | Instance ID of the application server |
 | `inspection_eni_id` | ENI ID of the inspection appliance (target for ingress routing) |
