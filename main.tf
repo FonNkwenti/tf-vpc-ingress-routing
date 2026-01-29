@@ -153,7 +153,7 @@ module "inspection_instance" {
   associate_public_ip_address = true
 
   # Critical for Routing
-  source_dest_check      = true
+  source_dest_check      = false
 
   user_data = file("${path.module}/scripts/inspection_userdata.sh")
 
