@@ -1,5 +1,15 @@
 data "aws_availability_zones" "available" {}
 
+data "aws_ami" "amazon_linux" {
+  most_recent = true
+  owners      = ["amazon"]
+
+  filter {
+    name   = "name"
+    values = ["al2023-ami-2023.*-x86_64"]
+  }
+}
+
 
 
 ################################################################################
@@ -135,6 +145,7 @@ module "inspection_instance" {
   name = "${local.name}-inspection"
 
   instance_type          = var.instance_type
+  ami                    = data.aws_ami.amazon_linux.id
   key_name               = var.ssh_key_name
   monitoring             = true
   vpc_security_group_ids = [module.inspection_sg.security_group_id]
@@ -143,13 +154,7 @@ module "inspection_instance" {
   # Critical for Routing
   source_dest_check      = false
 
-  user_data = <<-EOF
-              #!/bin/bash
-              echo "Enabling IP Forwarding..."
-              sysctl -w net.ipv4.ip_forward=1
-              echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
-              yum install -y tcpdump
-              EOF
+  user_data = file("${path.module}/scripts/inspection_userdata.sh")
 
   tags = {
     Terraform   = "true"
@@ -166,19 +171,14 @@ module "application_instance" {
   name = "${local.name}-application"
 
   instance_type          = var.instance_type
+  ami                    = data.aws_ami.amazon_linux.id
   key_name               = var.ssh_key_name
   monitoring             = true
   vpc_security_group_ids = [module.application_sg.security_group_id]
   subnet_id              = module.vpc.public_subnets[0] # Public Subnet
   associate_public_ip_address = true
 
-  user_data = <<-EOF
-              #!/bin/bash
-              yum install -y httpd
-              systemctl start httpd
-              systemctl enable httpd
-              echo "<h1>Application Server Reached!</h1><p>If you see this, traffic flow worked.</p>" > /var/www/html/index.html
-              EOF
+  user_data = file("${path.module}/scripts/app_userdata.sh")
 
   tags = {
     Terraform   = "true"
