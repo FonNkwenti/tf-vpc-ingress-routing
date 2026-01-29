@@ -21,3 +21,7 @@ output "inspection_eni_id" {
 output "inspection_public_ip" {
   value = module.inspection_instance.public_ip
 }
+
+output "application_private_ip" {
+  value = module.application_instance.private_ip
+}
