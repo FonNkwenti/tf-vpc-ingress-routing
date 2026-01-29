@@ -25,7 +25,7 @@ variable "public_subnet_cidr" {
 variable "ssh_key_name" {
   description = "SSH key name for EC2 instances"
   type        = string
-  default     = "default-use1"
+  default     = "CHANGE_ME"
 }
 
 variable "instance_type" {

@@ -29,8 +29,12 @@ This Terraform project deploys an AWS architecture demonstrating **VPC Ingress R
     terraform init
     ```
 
-3.  **Configure Variables (Optional):**
-    Create a `terraform.tfvars` file or override defaults using command-line flags. Key variables include `ssh_key_name` and `allowed_mgmt_cidr`.
+3.  **Configure Variables:**
+    Copy the example variables file:
+    ```bash
+    cp terraform.tfvars.example terraform.tfvars
+    ```
+    Open `terraform.tfvars` and set `ssh_key_name` to your actual AWS key pair name. You can also customize other variables here.
 
 4.  **Plan and Apply:**
     ```bash
@@ -63,7 +67,7 @@ This Terraform project deploys an AWS architecture demonstrating **VPC Ingress R
 | `vpc_cidr` | CIDR block for the VPC | `string` | `10.0.0.0/16` |
 | `inspection_subnet_cidr` | CIDR for inspection subnet | `string` | `10.0.50.0/24` |
 | `public_subnet_cidr` | CIDR for public subnet | `string` | `10.0.100.0/24` |
-| `ssh_key_name` | SSH key name for instances | `string` | `default-use1` |
+| `ssh_key_name` | SSH key name for instances | `string` | `CHANGE_ME` |
 | `instance_type` | EC2 instance type | `string` | `t3.micro` |
 | `allowed_mgmt_cidr` | CIDR allowed for SSH access | `string` | `0.0.0.0/0` |
 
