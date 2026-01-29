@@ -25,15 +25,13 @@ module "vpc" {
 
   azs             = local.azs
   
-  # Public Subnet (Application)
-  public_subnets  = [var.public_subnet_cidr]
-  public_subnet_names = ["public-subnet-application"]
+  # Public Subnet (Inspection Appliance - Needs direct IGW access)
+  public_subnets  = [var.inspection_subnet_cidr]
+  public_subnet_names = ["inspection-subnet"]
   
-  # Private Subnet (Inspection) 
-  # We use private_subnets to get a separate route table, 
-  # then we manually add the IGW route to make it "public" but separate.
-  private_subnets = [var.inspection_subnet_cidr]
-  private_subnet_names = ["inspection-subnet"]
+  # Private Subnet (Application Server - Needs routing via Inspection)
+  private_subnets = [var.public_subnet_cidr]
+  private_subnet_names = ["public-subnet-application"]
 
   enable_nat_gateway = false
   enable_vpn_gateway = false
@@ -69,14 +67,13 @@ resource "aws_route_table_association" "edge_ingress" {
   route_table_id = aws_route_table.edge_ingress.id
 }
 
-# 2. Inspection Subnet Custom Route
-# The inspection subnet (technically "private" in module terms) needs direct internet access
-# via IGW to function as the inspection/NAT device.
-resource "aws_route" "inspection_to_igw" {
-  # Since there is 1 private subnet, there is 1 private route table created by the module.
+# 2. Application Subnet Custom Route (Egress)
+# Traffic from the Application Subnet destined for the Internet (0.0.0.0/0)
+# must go through the Inspection ENI to ensure symmetric routing.
+resource "aws_route" "app_to_inspection" {
   route_table_id         = module.vpc.private_route_table_ids[0]
   destination_cidr_block = "0.0.0.0/0"
-  gateway_id             = module.vpc.igw_id
+  network_interface_id   = module.inspection_instance.primary_network_interface_id
 }
 
 # END: Custom Routing Logic
@@ -149,7 +146,7 @@ module "inspection_instance" {
   key_name               = var.ssh_key_name
   monitoring             = true
   vpc_security_group_ids = [module.inspection_sg.security_group_id]
-  subnet_id              = module.vpc.private_subnets[0] # Inspection Subnet
+  subnet_id              = module.vpc.public_subnets[0] # Inspection Subnet (Now Public)
   associate_public_ip_address = true
 
   # Critical for Routing
@@ -176,7 +173,7 @@ module "application_instance" {
   key_name               = var.ssh_key_name
   monitoring             = true
   vpc_security_group_ids = [module.application_sg.security_group_id]
-  subnet_id              = module.vpc.public_subnets[0] # Public Subnet
+  subnet_id              = module.vpc.private_subnets[0] # Public Subnet (Now "Private" routing)
   associate_public_ip_address = true
 
   user_data = file("${path.module}/scripts/app_userdata.sh")
