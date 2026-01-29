@@ -1,0 +1,188 @@
+data "aws_availability_zones" "available" {}
+
+
+
+################################################################################
+# VPC Module
+################################################################################
+
+module "vpc" {
+  source  = "terraform-aws-modules/vpc/aws"
+  version = "~> 5.0"
+
+  name = "${local.name}-vpc"
+  cidr = var.vpc_cidr
+
+  azs             = local.azs
+  
+  # Public Subnet (Application)
+  public_subnets  = [var.public_subnet_cidr]
+  public_subnet_names = ["public-subnet-application"]
+  
+  # Private Subnet (Inspection) 
+  # We use private_subnets to get a separate route table, 
+  # then we manually add the IGW route to make it "public" but separate.
+  private_subnets = [var.inspection_subnet_cidr]
+  private_subnet_names = ["inspection-subnet"]
+
+  enable_nat_gateway = false
+  enable_vpn_gateway = false
+
+  # Ensure we have IGW
+  create_igw = true
+
+  tags = {
+    Terraform = "true"
+    Environment = "dev"
+  }
+}
+
+# START: Custom Routing Logic
+
+# 1. Edge Route Table (Ingress Routing)
+# Routes traffic destined for the Public Subnet (App) to the Inspection ENI
+resource "aws_route_table" "edge_ingress" {
+  vpc_id = module.vpc.vpc_id
+
+  route {
+    cidr_block           = var.public_subnet_cidr
+    network_interface_id = module.inspection_instance.primary_network_interface_id
+  }
+
+  tags = {
+    Name = "${local.name}-edge-rt"
+  }
+}
+
+resource "aws_route_table_association" "edge_ingress" {
+  gateway_id     = module.vpc.igw_id
+  route_table_id = aws_route_table.edge_ingress.id
+}
+
+# 2. Inspection Subnet Custom Route
+# The inspection subnet (technically "private" in module terms) needs direct internet access
+# via IGW to function as the inspection/NAT device.
+resource "aws_route" "inspection_to_igw" {
+  # Since there is 1 private subnet, there is 1 private route table created by the module.
+  route_table_id         = module.vpc.private_route_table_ids[0]
+  destination_cidr_block = "0.0.0.0/0"
+  gateway_id             = module.vpc.igw_id
+}
+
+# END: Custom Routing Logic
+
+
+################################################################################
+# Security Groups Module
+################################################################################
+
+module "inspection_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 5.0"
+
+  name        = "${local.name}-inspection-sg"
+  description = "Security group for inspection appliance"
+  vpc_id      = module.vpc.vpc_id
+
+  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress_rules       = ["http-80-tcp", "all-icmp"]
+  
+  # SSH access
+  ingress_with_cidr_blocks = [
+    {
+      rule        = "ssh-tcp"
+      cidr_blocks = var.allowed_mgmt_cidr
+    }
+  ]
+
+  egress_rules = ["all-all"]
+}
+
+module "application_sg" {
+  source  = "terraform-aws-modules/security-group/aws"
+  version = "~> 5.0"
+
+  name        = "${local.name}-application-sg"
+  description = "Security group for application server"
+  vpc_id      = module.vpc.vpc_id
+
+  # Ingress from ANY (0.0.0.0/0) because traffic comes from Inspection Appliance
+  # which preserves source IP if just routing, OR if masquerading acts as source.
+  # The requirement says "routing", implying source IP preservation.
+  ingress_cidr_blocks = ["0.0.0.0/0"]
+  ingress_rules       = ["http-80-tcp", "all-icmp"]
+
+  # SSH access
+  ingress_with_cidr_blocks = [
+    {
+      rule        = "ssh-tcp"
+      cidr_blocks = var.allowed_mgmt_cidr
+    }
+  ]
+
+  egress_rules = ["all-all"]
+}
+
+################################################################################
+# Compute Module
+################################################################################
+
+# Inspection Appliance
+module "inspection_instance" {
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 5.0"
+
+  name = "${local.name}-inspection"
+
+  instance_type          = var.instance_type
+  key_name               = var.ssh_key_name
+  monitoring             = true
+  vpc_security_group_ids = [module.inspection_sg.security_group_id]
+  subnet_id              = module.vpc.private_subnets[0] # Inspection Subnet
+
+  # Critical for Routing
+  source_dest_check      = false
+
+  user_data = <<-EOF
+              #!/bin/bash
+              echo "Enabling IP Forwarding..."
+              sysctl -w net.ipv4.ip_forward=1
+              echo "net.ipv4.ip_forward=1" >> /etc/sysctl.conf
+              yum install -y tcpdump
+              EOF
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+    Role        = "inspection"
+  }
+}
+
+# Application Server
+module "application_instance" {
+  source  = "terraform-aws-modules/ec2-instance/aws"
+  version = "~> 5.0"
+
+  name = "${local.name}-application"
+
+  instance_type          = var.instance_type
+  key_name               = var.ssh_key_name
+  monitoring             = true
+  vpc_security_group_ids = [module.application_sg.security_group_id]
+  subnet_id              = module.vpc.public_subnets[0] # Public Subnet
+  associate_public_ip_address = true
+
+  user_data = <<-EOF
+              #!/bin/bash
+              yum install -y httpd
+              systemctl start httpd
+              systemctl enable httpd
+              echo "<h1>Application Server Reached!</h1><p>If you see this, traffic flow worked.</p>" > /var/www/html/index.html
+              EOF
+
+  tags = {
+    Terraform   = "true"
+    Environment = "dev"
+    Role        = "application"
+  }
+}
